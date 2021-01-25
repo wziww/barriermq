@@ -40,6 +40,7 @@ type Service struct {
 	requeueCount uint64
 	close        chan int
 	closeDone    chan int
+	newMsg       func() Message
 	handler      Handler
 	wakeup       chan int
 	done         int32
@@ -63,6 +64,7 @@ func NewService(option Options) (*Service, error) {
 		wakeup:         make(chan int),
 		close:          make(chan int, 1),
 		closeDone:      make(chan int, 1),
+		newMsg:         option.NewMsg,
 	}
 	services[option.Name] = s
 	m.Unlock()

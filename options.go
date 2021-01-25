@@ -22,4 +22,5 @@ type Options struct {
 	SyncEvery       int64
 	SyncTimeout     time.Duration
 	Logf            diskqueue.AppLogFunc
+	NewMsg          func() Message
 }
