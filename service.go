@@ -17,8 +17,6 @@ var (
 	services  map[string]*Service
 	// ErrExists 服务已存在
 	ErrExists error = errors.New("Service duplicate, plz check your config")
-	hits      uint64
-	misses    uint64
 )
 
 func init() {
@@ -228,11 +226,7 @@ func (s *Service) Debug() map[string]interface{} {
 	m["mem_current"] = len(s.memoryMsgQueue.Msg)
 	m["disk_total"] = atomic.LoadUint64(&s.diskMsgQueue.TotalCount)
 	m["disk_current"] = s.diskMsgQueue.Queue.Depth()
-	m["cache_stats_lv2"] =
-		map[string]uint64{
-			"hits":   atomic.LoadUint64(&hits),
-			"misses": atomic.LoadUint64(&misses),
-		}
+
 	return m
 }
 
