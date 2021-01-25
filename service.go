@@ -161,6 +161,7 @@ func (s *Service) background() {
 			s._lock.RLock()
 			if s.handler != nil {
 				if err := s.handler(_msg); err != nil {
+					s._lock.Unlock()
 					timer := time.NewTimer(s.option.FullWaitTime)
 					select {
 					case <-timer.C:
@@ -170,8 +171,9 @@ func (s *Service) background() {
 						timer.Stop()
 						goto loop
 					}
+				} else {
+					s._lock.Unlock()
 				}
-				s._lock.Unlock()
 			}
 		}
 	}()
