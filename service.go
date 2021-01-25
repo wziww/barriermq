@@ -60,6 +60,7 @@ func NewService(option Options) (*Service, error) {
 		nonBlockQueue:  NewNlockQueue(option.MemQueueSize),
 		diskMsgQueue:   diskqueue,
 		option:         option,
+		wakeup:         make(chan int),
 		close:          make(chan int, 1),
 		closeDone:      make(chan int, 1),
 	}
