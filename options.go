@@ -14,8 +14,9 @@ type Options struct {
 	// time to try requeue message
 	RequeueTime time.Duration
 	// disk queue part
-	Name            string
-	DataPath        string
+	Name     string
+	DataPath string
+	// disk queue max bytes per-file
 	MaxBytesPerFile int64
 	MinMsgSize      int32
 	MaxMsgSize      int32
