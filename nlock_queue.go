@@ -125,6 +125,9 @@ loop:
 			q._lock.RLock()
 			fn := q.handler
 			q._lock.RUnlock()
+			if fn == nil {
+				goto next
+			}
 			if err := fn(q.queue[atomic.LoadUint64(&q.tail)&q._mask].data); err == nil {
 				q.queue[atomic.LoadUint64(&q.tail)&q._mask].data = nil // avoid stuck affect GC
 				atomic.AddUint64(&q.tail, 1)
