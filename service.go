@@ -144,6 +144,7 @@ func (s *Service) background() {
 					continue
 				}
 			case msg := <-s.diskMsgQueue.Queue.ReadChan():
+				_msg = s.newMsg()
 				_msg.Decode(msg)
 			}
 			/*
