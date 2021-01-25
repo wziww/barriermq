@@ -15,14 +15,14 @@ type MemQueue struct {
 var _ Queue = new(MemQueue)
 
 // NewMemQueue ...
-func NewMemQueue(_size int64) *MemQueue {
+func NewMemQueue(option Options) *MemQueue {
 	mq := &MemQueue{
 		TotalCount: 0,
 		InitTime:   time.Now(),
 		state:      stateOpen,
 	}
-	if _size > 0 {
-		mq.Msg = make(chan interface{}, _size)
+	if option.MemQueueSize > 0 {
+		mq.Msg = make(chan interface{}, int(option.MemQueueSize))
 	}
 	return mq
 }

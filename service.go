@@ -58,8 +58,8 @@ func NewService(option Options) (*Service, error) {
 	dq := NewDiskQueue(option)
 	s := &Service{
 		ID:             atomic.AddUint64(&serviceID, 1),
-		memoryMsgQueue: NewMemQueue(option.MemQueueSize),
-		nonBlockQueue:  NewNlockQueue(option.MemQueueSize),
+		memoryMsgQueue: NewMemQueue(option),
+		nonBlockQueue:  NewNlockQueue(option),
 		diskMsgQueue:   dq,
 		option:         option,
 		wakeup:         make(chan int),

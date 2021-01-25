@@ -61,18 +61,19 @@ func (q *NLockQueue) Cap() int64 {
 }
 
 // NewNlockQueue ...
-func NewNlockQueue(_size int64) *NLockQueue {
+func NewNlockQueue(option Options) *NLockQueue {
 	nq := NLockQueue{
-		wakeup:  make(chan int, 1),
-		handler: _defaultHandler,
+		wakeup:       make(chan int, 1),
+		handler:      _defaultHandler,
+		FullWaitTime: option.FullWaitTime,
 	}
-	size := internal.GetSize(uint64(_size))
+	size := internal.GetSize(uint64(option.MemQueueSize))
 	if size > math.MaxInt64 {
 		panic(ErrOutOfRange)
 	}
 	nq._mask = size - 1
 	nq.size = int64(size)
-	if _size > 0 {
+	if option.MemQueueSize > 0 {
 		nq.queue = make([]q, size)
 	}
 	go nq.background(true)
