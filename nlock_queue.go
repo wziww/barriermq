@@ -33,7 +33,7 @@ type q struct {
 // NLockQueue ...
 // No Locker Qeueue
 type NLockQueue struct {
-	_lock        sync.Mutex
+	_lock        sync.RWMutex
 	head, tail   uint64
 	queue        []q
 	size         int64
@@ -78,12 +78,16 @@ func NewNlockQueue(_size int64) *NLockQueue {
 	go nq.background(true)
 	return &nq
 }
+
+// RegistHandler ...
 func (q *NLockQueue) RegistHandler(fn Handler) {
 	q._lock.Lock()
 	defer q._lock.Unlock()
 	q.handler = fn
 
 }
+
+// Push put message
 func (q *NLockQueue) Push(msg interface{}) bool {
 	var current uint64 = atomic.LoadUint64(&q.head)
 	next := current + 1
@@ -100,10 +104,9 @@ func (q *NLockQueue) Push(msg interface{}) bool {
 			}
 			atomic.AddUint64(&q.Success, 1)
 			return true
-		} else {
-			current = atomic.LoadUint64(&q.head)
-			next = current + 1
 		}
+		current = atomic.LoadUint64(&q.head)
+		next = current + 1
 	}
 }
 
@@ -118,10 +121,13 @@ loop:
 			continue
 		}
 		for ; nums > 0; nums-- {
+			q._lock.RLock()
 			if err := q.handler(q.queue[atomic.LoadUint64(&q.tail)&q._mask].data); err != nil {
+				q._lock.RUnlock()
 				q.queue[atomic.LoadUint64(&q.tail)&q._mask].data = nil // avoid stuck affect GC
 				atomic.AddUint64(&q.tail, 1)
 			} else { // error ? stuck then
+				q._lock.RUnlock()
 				goto next
 			}
 		}
@@ -142,9 +148,13 @@ next:
 		return
 	}
 }
+
+// Wakeup ...
 func (q *NLockQueue) Wakeup() <-chan int {
 	return q.wakeup
 }
+
+// Sleep ...
 func (q *NLockQueue) Sleep() {
 	atomic.StoreInt32(&q.done, FreeStatus)
 }
