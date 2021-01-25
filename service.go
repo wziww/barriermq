@@ -160,7 +160,7 @@ func (s *Service) background() {
 		loop:
 			s._lock.RLock()
 			fn := s.handler
-			s._lock.Unlock()
+			s._lock.RUnlock()
 			if fn != nil {
 				if err := fn(_msg); err != nil {
 					timer := time.NewTimer(s.option.FullWaitTime)
