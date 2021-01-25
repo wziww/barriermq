@@ -123,12 +123,12 @@ loop:
 		}
 		for ; nums > 0; nums-- {
 			q._lock.RLock()
-			if err := q.handler(q.queue[atomic.LoadUint64(&q.tail)&q._mask].data); err == nil {
-				q._lock.RUnlock()
+			fn := q.handler
+			q._lock.RUnlock()
+			if err := fn(q.queue[atomic.LoadUint64(&q.tail)&q._mask].data); err == nil {
 				q.queue[atomic.LoadUint64(&q.tail)&q._mask].data = nil // avoid stuck affect GC
 				atomic.AddUint64(&q.tail, 1)
 			} else { // error ? stuck then
-				q._lock.RUnlock()
 				goto next
 			}
 		}

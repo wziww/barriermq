@@ -33,20 +33,24 @@ type Service struct {
 	ID uint64
 	// in memory message queue
 	memoryMsgQueue *MemQueue
-	nonBlockQueue  *NLockQueue
+	// first level - no locker memory queue
+	nonBlockQueue *NLockQueue
 	// diskMsgQueue
 	diskMsgQueue *DiskQueue
 	total        uint64
 	requeueCount uint64
 	close        chan int
 	closeDone    chan int
-	wakeup       chan int
-	done         int32
-	option       Options
-	_lock        sync.RWMutex
-	newMsg       func() Message
-	handler      Handler
-	logf         diskqueue.AppLogFunc
+	// background worker wakeup sig
+	wakeup chan int
+	// tag to decide whether to send wakeup sig
+	done   int32
+	option Options
+	// handler fn lock
+	_lock   sync.RWMutex
+	newMsg  func() Message
+	handler Handler
+	logf    diskqueue.AppLogFunc
 }
 
 // NewService .
