@@ -2,6 +2,7 @@ package barriermq
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -65,6 +66,12 @@ func NewService(option Options) (*Service, error) {
 		close:          make(chan int, 1),
 		closeDone:      make(chan int, 1),
 		newMsg:         option.NewMsg,
+		logf:           option.Logf,
+	}
+	if s.logf == nil {
+		s.logf = func(level diskqueue.LogLevel, f string, args ...interface{}) {
+			fmt.Printf(f, args...)
+		}
 	}
 	services[option.Name] = s
 	m.Unlock()
