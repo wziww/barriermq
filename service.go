@@ -210,29 +210,27 @@ flush:
 	// log.L.Println(s.Name, "disk queue flush success ...")
 }
 
-// Report ...
-// func (s *Service) Report() interface{} {
-// 	m := map[string]interface{}{}
-// 	m["total"] = atomic.LoadUint64(&s.total)
-// 	m["requeue"] = atomic.LoadUint64(&s.requeueCount)
-// 	m["nlock_queue_current"] = s.nonBlockQueue.Len()
-// 	m["nlock_queue_total"] = atomic.LoadUint64(&s.nonBlockQueue.Success) + atomic.LoadUint64(&s.nonBlockQueue.Failed)
-// 	m["nlock_queue_success"] = atomic.LoadUint64(&s.nonBlockQueue.Success)
-// 	m["nlock_queue_failed"] = atomic.LoadUint64(&s.nonBlockQueue.Failed)
-// 	m["mem_total"] = atomic.LoadUint64(&s.memoryMsgQueue.TotalCount)
-// 	// m["mem_success"] = atomic.LoadUint64(&s.memoryMsgQueue.SuccessCount)
-// 	m["mem_current"] = len(s.memoryMsgQueue.Msg)
-// 	m["disk_total"] = atomic.LoadUint64(&s.diskMsgQueue.TotalCount)
-// 	m["disk_current"] = s.diskMsgQueue.Queue.Depth()
-// 	m["cache_stats_lv1"] = cache.State()
-// 	m["cache_stats_lv2"] =
-// 		map[string]uint64{
-// 			"hits":   atomic.LoadUint64(&hits),
-// 			"misses": atomic.LoadUint64(&misses),
-// 		}
-// 	m["goroutine_nums"] = runtime.NumGoroutine()
-// 	return m
-// }
+// Debug ...
+func (s *Service) Debug() map[string]interface{} {
+	m := map[string]interface{}{}
+	m["total"] = atomic.LoadUint64(&s.total)
+	m["requeue"] = atomic.LoadUint64(&s.requeueCount)
+	m["nlock_queue_current"] = s.nonBlockQueue.Len()
+	m["nlock_queue_total"] = atomic.LoadUint64(&s.nonBlockQueue.Success) + atomic.LoadUint64(&s.nonBlockQueue.Failed)
+	m["nlock_queue_success"] = atomic.LoadUint64(&s.nonBlockQueue.Success)
+	m["nlock_queue_failed"] = atomic.LoadUint64(&s.nonBlockQueue.Failed)
+	m["mem_total"] = atomic.LoadUint64(&s.memoryMsgQueue.TotalCount)
+	// m["mem_success"] = atomic.LoadUint64(&s.memoryMsgQueue.SuccessCount)
+	m["mem_current"] = len(s.memoryMsgQueue.Msg)
+	m["disk_total"] = atomic.LoadUint64(&s.diskMsgQueue.TotalCount)
+	m["disk_current"] = s.diskMsgQueue.Queue.Depth()
+	m["cache_stats_lv2"] =
+		map[string]uint64{
+			"hits":   atomic.LoadUint64(&hits),
+			"misses": atomic.LoadUint64(&misses),
+		}
+	return m
+}
 
 // StopAll 关闭接入层所有 server & 数据持久化
 func StopAll() {
