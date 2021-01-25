@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nsqio/go-diskqueue"
 )
 
 var (
@@ -38,12 +39,13 @@ type Service struct {
 	requeueCount uint64
 	close        chan int
 	closeDone    chan int
-	newMsg       func() Message
-	handler      Handler
 	wakeup       chan int
 	done         int32
 	option       Options
 	_lock        sync.RWMutex
+	newMsg       func() Message
+	handler      Handler
+	logf         diskqueue.AppLogFunc
 }
 
 // NewService .
@@ -52,12 +54,12 @@ func NewService(option Options) (*Service, error) {
 	if _, ok := services[option.Name]; ok {
 		return nil, ErrExists
 	}
-	diskqueue := NewDiskQueue(option)
+	dq := NewDiskQueue(option)
 	s := &Service{
 		ID:             atomic.AddUint64(&serviceID, 1),
 		memoryMsgQueue: NewMemQueue(option.MemQueueSize),
 		nonBlockQueue:  NewNlockQueue(option.MemQueueSize),
-		diskMsgQueue:   diskqueue,
+		diskMsgQueue:   dq,
 		option:         option,
 		wakeup:         make(chan int),
 		close:          make(chan int, 1),
@@ -67,7 +69,7 @@ func NewService(option Options) (*Service, error) {
 	services[option.Name] = s
 	m.Unlock()
 	s.background()
-	// log.L.Println(option.Name, "service start success")
+	s.logf(diskqueue.INFO, "%s %s", option.Name, "service start success")
 	return s, nil
 }
 
@@ -116,19 +118,19 @@ func (s *Service) Put(data Message) {
 	default:
 		err := s.diskMsgQueue.Put(data.Encode())
 		if err != nil {
-			// log.L.Errorln(err)
+			s.logf(diskqueue.ERROR, "%s", err.Error())
 		}
 	}
 }
 
 func (s *Service) background() {
 	go func() {
-		// log.L.Println(s.Name, "background job start")
+		s.logf(diskqueue.INFO, "%s %s", s.option.Name, "background job start")
 		for {
 			var _msg Message
 			select {
 			case <-s.close:
-				// log.L.Println(s.Name, "background job exit success ...")
+				s.logf(diskqueue.INFO, "%s %s", s.option.Name, "background job exit success ...")
 				s.closeDone <- 1
 				runtime.Goexit()
 			case msg := <-s.memoryMsgQueue.Consumer():
@@ -137,7 +139,7 @@ func (s *Service) background() {
 					_msg = msg.(Message)
 				case nil:
 				default:
-					// log.L.Println(s.Name, "msg assert error")
+					s.logf(diskqueue.ERROR, "%s %s", s.option.Name, "msg assert error")
 					// TODO
 					continue
 				}
@@ -187,7 +189,7 @@ func (s *Service) Release() {
 
 // Exit ...
 func (s *Service) Exit() {
-	// log.L.Println(s.Name, "start stop ...")
+	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "begin to stop ...")
 	s.close <- 1 // stop background worker first
 	<-s.closeDone
 	for {
@@ -197,6 +199,7 @@ func (s *Service) Exit() {
 			case Message:
 				msg := each.(Message)
 				if err := s.diskMsgQueue.Put(msg.Encode()); err != nil {
+					s.logf(diskqueue.ERROR, "%s %s", s.option.Name, err.Error())
 					// log.L.Errorln(err)
 				}
 			case nil:
@@ -206,10 +209,10 @@ func (s *Service) Exit() {
 		}
 	}
 flush:
-	// log.L.Println(s.Name, "memory queue flush success ...")
-	// log.L.Println(s.Name, "start disk queue ...")
+	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "memory queue flush success ...")
+	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "start disk queue ...")
 	s.diskMsgQueue.Queue.Close() // stop disk queue
-	// log.L.Println(s.Name, "disk queue flush success ...")
+	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "disk queue flush success ...")
 }
 
 // Debug ...
@@ -222,7 +225,6 @@ func (s *Service) Debug() map[string]interface{} {
 	m["nlock_queue_success"] = atomic.LoadUint64(&s.nonBlockQueue.Success)
 	m["nlock_queue_failed"] = atomic.LoadUint64(&s.nonBlockQueue.Failed)
 	m["mem_total"] = atomic.LoadUint64(&s.memoryMsgQueue.TotalCount)
-	// m["mem_success"] = atomic.LoadUint64(&s.memoryMsgQueue.SuccessCount)
 	m["mem_current"] = len(s.memoryMsgQueue.Msg)
 	m["disk_total"] = atomic.LoadUint64(&s.diskMsgQueue.TotalCount)
 	m["disk_current"] = s.diskMsgQueue.Queue.Depth()

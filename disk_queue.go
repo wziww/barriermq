@@ -33,7 +33,7 @@ func NewDiskQueue(option Options) *DiskQueue {
 	t := &DiskQueue{}
 	if option.Logf == nil {
 		option.Logf = func(level diskqueue.LogLevel, f string, args ...interface{}) {
-			fmt.Sprintf(f, args...)
+			fmt.Printf(f, args...)
 		}
 	}
 	t.Queue = diskqueue.New(
