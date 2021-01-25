@@ -7,30 +7,30 @@
 ```go
 // example
 s, err := barriermq.NewService(barriermq.Options{
-      MemQueueSize:    config.C.MemQueueSize,
-      FullWaitTime:    time.Microsecond * time.Duration(config.C.Kafka.FullWaitMillisecond),
-      RequeueTime:     time.Second,
-      Name:            name,
-      DataPath:        config.C.DataPath,
-      MaxBytesPerFile: config.C.MaxBytesPerFile,
-      MinMsgSize:      0,
-      MaxMsgSize:      config.C.MaxMsgSize,
-      SyncEvery:       config.C.SyncEvery,
-      SyncTimeout:     time.Millisecond * time.Duration(config.C.SyncTimeout),
-      Logf: func(level diskqueue.LogLevel, f string, args ...interface{}) {
-        switch level {
-        case diskqueue.ERROR:
-            log.L.Errorf(f, args...)
-        default:
-            log.L.Infof(f, args...)
-        }
-      },
-      NewMsg: func() barriermq.Message {
-        return &message.Message{}
-      },
-    })
+              MemQueueSize:    config.C.MemQueueSize,
+              FullWaitTime:    time.Microsecond * time.Duration(config.C.Kafka.FullWaitMillisecond),
+              RequeueTime:     time.Second,
+              Name:            name,
+              DataPath:        config.C.DataPath,
+              MaxBytesPerFile: config.C.MaxBytesPerFile,
+              MinMsgSize:      0,
+              MaxMsgSize:      config.C.MaxMsgSize,
+              SyncEvery:       config.C.SyncEvery,
+              SyncTimeout:     time.Millisecond * time.Duration(config.C.SyncTimeout),
+              Logf: func(level diskqueue.LogLevel, f string, args ...interface{}) {
+                switch level {
+                case diskqueue.ERROR:
+                    log.L.Errorf(f, args...)
+                default:
+                    log.L.Infof(f, args...)
+                }
+              },
+              NewMsg: func() barriermq.Message {
+                return &message.Message{}
+              },
+            })
 
-  s.RegistHandler(func(data interface{}) error {
+s.RegistHandler(func(data interface{}) error {
     // do some thing
     if success {
 
@@ -39,10 +39,10 @@ s, err := barriermq.NewService(barriermq.Options{
     } else {
 
       s.RequeueMessage(data)
-      
+
     }
     return err
-  })
+})
 s.put(nil)
 
 ```
