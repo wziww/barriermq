@@ -136,7 +136,7 @@ loop:
 	}
 next:
 	if lp {
-		timer := time.NewTimer(time.Millisecond * q.FullWaitTime)
+		timer := time.NewTimer(q.FullWaitTime)
 		select {
 		case <-timer.C:
 			goto loop
