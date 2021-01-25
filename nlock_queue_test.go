@@ -1,6 +1,7 @@
 package barriermq
 
 import (
+	"errors"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -34,6 +35,9 @@ func TestPush(t *testing.T) {
 			t.Fatal("non block queue push error -- should success")
 		}
 	}
+	if q.Len() != int64(__size) {
+		t.Fatalf("nlock_queue Len func error")
+	}
 	if q.Push(nil) {
 		t.Fatal("non block queue push error -- should fail")
 	}
@@ -44,6 +48,12 @@ func TestPush(t *testing.T) {
 		t.Fatal("tail position error")
 	}
 	q.background(false)
+	if q.Len() != 0 {
+		t.Fatalf("nlock_queue Len func error")
+	}
+	if q.Cap() != int64(__size) {
+		t.Fatalf("nlock_queue Cap func error")
+	}
 	if q.head != 16 {
 		t.Fatal("head position error")
 	}
@@ -55,6 +65,15 @@ func TestPush(t *testing.T) {
 			t.Fatal("non block queue push error -- should success")
 		}
 	}
+	q.RegistHandler(func(data interface{}) error {
+		return errors.New("test")
+	})
+	if q.Cap() != 0 {
+		t.Fatalf("nlock_queue Cap func error")
+	}
+	if q.Len() != int64(__size) {
+		t.Fatalf("nlock_queue Len func error")
+	}
 }
 func TestMultiplePush(t *testing.T) {
 	var _size int64 = 10
@@ -62,7 +81,7 @@ func TestMultiplePush(t *testing.T) {
 	var g sync.WaitGroup
 	var err uint32
 	__size := internal.GetSize(10)
-	for i := 0; i < int(__size)+10; i++ {
+	for i := 0; i < int(__size)+100; i++ {
 		g.Add(1)
 		go func() {
 			defer g.Done()
@@ -72,7 +91,7 @@ func TestMultiplePush(t *testing.T) {
 		}()
 	}
 	g.Wait()
-	if atomic.LoadUint32(&err) != 10 {
+	if atomic.LoadUint32(&err) != 100 {
 		t.Fatal("non block queue push error -- success / failed should be 16 / 10")
 	}
 	if q.Push(nil) {
