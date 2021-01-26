@@ -208,7 +208,7 @@ func (s *Service) Release() {
 
 // Exit ...
 func (s *Service) Exit() {
-	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "begin to stop ...")
+	s.logf(diskqueue.INFO, "service %s %s", s.option.Name, "begin to stop ...")
 	atomic.StoreUint32(&s.status, closed) // close put method
 	s.close <- 1                          // stop background worker first
 	<-s.closeDone
@@ -219,11 +219,11 @@ func (s *Service) Exit() {
 	var times int
 	for range t.C {
 		if s.nonBlockQueue.Len() == 0 {
-			s.logf(diskqueue.INFO, "%s", s.option.Name, "non block queue success")
+			s.logf(diskqueue.INFO, "%s", s.option.Name, "non block queue flush success !")
 			break
 		}
 		if times >= 10 {
-			s.logf(diskqueue.ERROR, "%s %s %d %s", s.option.Name, "non block queue flush error, lost about", s.nonBlockQueue.Len(), "message")
+			s.logf(diskqueue.ERROR, "%s %s %d %s", s.option.Name, "non block queue flush error, lost about", s.nonBlockQueue.Len(), "messages")
 			break
 		}
 		times++
@@ -246,10 +246,14 @@ func (s *Service) Exit() {
 		}
 	}
 flush:
-	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "memory queue flush success ...")
-	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "start disk queue ...")
-	s.diskMsgQueue.Queue.Close() // stop disk queue
-	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "disk queue flush success ...")
+	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "memory queue flush success !")
+	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "start disk queue flush ...")
+	err := s.diskMsgQueue.Queue.Close() // stop disk queue
+	if err == nil {
+		s.logf(diskqueue.INFO, "%s %s", s.option.Name, "disk queue flush success !")
+	} else {
+		s.logf(diskqueue.ERROR, "%s %s %s", s.option.Name, "disk queue flush error", err)
+	}
 }
 
 // Debug ...
