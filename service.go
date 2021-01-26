@@ -223,7 +223,8 @@ func (s *Service) Exit() {
 			break
 		}
 		if times >= 10 {
-			s.logf(diskqueue.ERROR, "%s %s %d %s", "non block queue flush error, lost about", s.option.Name, s.nonBlockQueue.Len(), "message")
+			s.logf(diskqueue.ERROR, "%s %s %d %s", s.option.Name, "non block queue flush error, lost about", s.nonBlockQueue.Len(), "message")
+			break
 		}
 		times++
 	}
