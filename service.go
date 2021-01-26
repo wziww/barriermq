@@ -13,11 +13,13 @@ import (
 )
 
 var (
+	open      uint32 = 0b00
+	closed    uint32 = 0b01
 	serviceID uint64
 	idPrefix  string
 	m         sync.RWMutex
 	services  map[string]*Service
-	// ErrExists 服务已存在
+	// ErrExists ...
 	ErrExists error = errors.New("Service duplicate, plz check your config")
 )
 
@@ -51,6 +53,7 @@ type Service struct {
 	newMsg  func() Message
 	handler Handler
 	logf    diskqueue.AppLogFunc
+	status  uint32 // 0b00 open ob01 closed
 }
 
 // NewService .
@@ -71,6 +74,7 @@ func NewService(option Options) (*Service, error) {
 		closeDone:      make(chan int, 1),
 		newMsg:         option.NewMsg,
 		logf:           option.Logf,
+		status:         open,
 	}
 	if s.logf == nil {
 		s.logf = func(level diskqueue.LogLevel, f string, args ...interface{}) {
@@ -118,6 +122,9 @@ func FindService(name string) *Service {
  * 3. 本地追加落盘缓存
  */
 func (s *Service) Put(data Message) {
+	if atomic.LoadUint32(&s.status)&closed == 1 {
+		return
+	}
 	atomic.AddUint64(&s.total, 1)
 	// 无锁队列尝试写入
 	if s.nonBlockQueue.Push(data) {
@@ -202,8 +209,25 @@ func (s *Service) Release() {
 // Exit ...
 func (s *Service) Exit() {
 	s.logf(diskqueue.INFO, "%s %s", s.option.Name, "begin to stop ...")
-	s.close <- 1 // stop background worker first
+	atomic.StoreUint32(&s.status, closed) // close put method
+	s.close <- 1                          // stop background worker first
 	<-s.closeDone
+	/* Flush no-locker queue message to disk
+	 * Depends on whether use s.RequeueMessage(&v) in RegistHandler func
+	 */
+	t := time.NewTicker(time.Second)
+	var times int
+	for range t.C {
+		if s.nonBlockQueue.Len() == 0 {
+			s.logf(diskqueue.INFO, "%s", s.option.Name, "non block queue success")
+			break
+		}
+		if times >= 10 {
+			s.logf(diskqueue.ERROR, "%s %s %d %s", "non block queue flush error, lost about", s.option.Name, s.nonBlockQueue.Len(), "message")
+		}
+		times++
+	}
+	// flush chan queue message to disk
 	for {
 		select {
 		case each := <-s.memoryMsgQueue.Msg:
