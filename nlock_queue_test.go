@@ -173,6 +173,7 @@ func BenchmarkProducerNConsumer(b *testing.B) {
 	go func() {
 		for i := 0; i < testnums; i++ {
 			for !q.Push(nil) {
+				runtime.Gosched()
 			}
 		}
 	}()
