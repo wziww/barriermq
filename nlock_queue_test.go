@@ -106,17 +106,69 @@ func TestMultiplePush(t *testing.T) {
 	}
 }
 
+func BenchmarkMultipleProducerNConsumer(b *testing.B) {
+	var testnums int = 10000 * b.N
+	q := newNlockQueue(_size)
+	var wg sync.WaitGroup
+	q.RegistHandler(func(_ interface{}) error {
+		go wg.Done()
+		return nil
+	})
+	wg.Add(testnums)
+	b.ResetTimer()
+	// consumer
+	go q.background(true)
+	// producer
+	go b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < testnums/b.N; i++ {
+				for !q.Push(nil) {
+					runtime.Gosched()
+				}
+			}
+		}
+	})
+	wg.Wait()
+}
+
+func BenchmarkMultipleProducerNConsumerChan(b *testing.B) {
+	__size := internal.GetSize(uint64(_size))
+	var testnums int = 10000 * b.N
+	var wg sync.WaitGroup
+	wg.Add(testnums)
+	ch := make(chan int, __size)
+	b.ResetTimer()
+	// consumer
+	go func() {
+		for {
+			select {
+			case <-ch:
+				go wg.Done()
+			}
+		}
+	}()
+	// producer
+	go b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			for i := 0; i < testnums/b.N; i++ {
+				ch <- 1
+			}
+		}
+	})
+	wg.Wait()
+}
+
 func BenchmarkProducerNConsumer(b *testing.B) {
 	var testnums int = 100000
 	q := newNlockQueue(_size)
 	_ = internal.GetSize(uint64(_size))
-	b.ResetTimer()
 	var wg sync.WaitGroup
 	q.RegistHandler(func(_ interface{}) error {
-		wg.Done()
+		go wg.Done()
 		return nil
 	})
 	wg.Add(testnums)
+	b.ResetTimer()
 	// producer
 	go func() {
 		for i := 0; i < testnums; i++ {
@@ -125,22 +177,17 @@ func BenchmarkProducerNConsumer(b *testing.B) {
 		}
 	}()
 	// consumer
-	go func() {
-		for {
-			q.background(false)
-			runtime.Gosched()
-		}
-	}()
+	go q.background(true)
 	wg.Wait()
 }
 
 func BenchmarkProducerNConsumerChan(b *testing.B) {
 	__size := internal.GetSize(uint64(_size))
-	var testnums int = 1000000
-	b.ResetTimer()
+	var testnums int = 100000
 	var wg sync.WaitGroup
 	wg.Add(testnums)
 	ch := make(chan int, __size)
+	b.ResetTimer()
 	// producer
 	go func() {
 		for i := 0; i < testnums; i++ {
@@ -152,7 +199,7 @@ func BenchmarkProducerNConsumerChan(b *testing.B) {
 		for {
 			select {
 			case <-ch:
-				wg.Done()
+				go wg.Done()
 			}
 		}
 	}()
