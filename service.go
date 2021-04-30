@@ -13,12 +13,13 @@ import (
 )
 
 var (
-	open      uint32 = 0b00
-	closed    uint32 = 0b01
-	serviceID uint64
-	idPrefix  string
-	m         sync.RWMutex
-	services  map[string]*Service
+	open            uint32 = 0b00
+	closed          uint32 = 0b01
+	diskTempNotRead uint32 = 0b10
+	serviceID       uint64
+	idPrefix        string
+	m               sync.RWMutex
+	services        map[string]*Service
 	// ErrExists ...
 	ErrExists error = errors.New("Service duplicate, plz check your config")
 )
@@ -49,11 +50,12 @@ type Service struct {
 	done   int32
 	option Options
 	// handler fn lock
-	_lock   sync.RWMutex
-	newMsg  func() Message
-	handler Handler
-	logf    diskqueue.AppLogFunc
-	status  uint32 // 0b00 open ob01 closed
+	_lock      sync.RWMutex
+	newMsg     func() Message
+	handler    Handler
+	logf       diskqueue.AppLogFunc
+	status     uint32 // 0b00 open ob01 closed
+	retrytimes uint32
 }
 
 // NewService .
@@ -90,6 +92,15 @@ func NewService(option Options) (*Service, error) {
 
 // RequeueMessage requeue 消息一律重新投递进磁盘
 func (s *Service) RequeueMessage(msg Message) error {
+	newVal := atomic.AddUint32(&s.retrytimes, 1)
+	if newVal == 10 {
+		atomic.StoreUint32(&s.status, atomic.LoadUint32(&s.status)|diskTempNotRead)
+		go func() {
+			time.Sleep(time.Second * 10)
+			atomic.StoreUint32(&s.status, atomic.LoadUint32(&s.status)^diskTempNotRead)
+			atomic.StoreUint32(&s.retrytimes, 0)
+		}()
+	}
 	timer := time.NewTimer(s.option.RequeueTime)
 	select {
 	case <-timer.C:
@@ -122,7 +133,7 @@ func FindService(name string) *Service {
  * 3. 本地追加落盘缓存
  */
 func (s *Service) Put(data Message) {
-	if atomic.LoadUint32(&s.status)&closed == 1 {
+	if atomic.LoadUint32(&s.status)&closed == closed {
 		return
 	}
 	atomic.AddUint64(&s.total, 1)
@@ -146,24 +157,42 @@ func (s *Service) background() {
 		s.logf(diskqueue.INFO, "%s %s", s.option.Name, "background job start")
 		for {
 			var _msg Message
-			select {
-			case <-s.close:
-				s.logf(diskqueue.INFO, "%s %s", s.option.Name, "background job exit success ...")
-				s.closeDone <- 1
-				runtime.Goexit()
-			case msg := <-s.memoryMsgQueue.Consumer():
-				switch msg.(type) {
-				case Message:
-					_msg = msg.(Message)
-				case nil:
-				default:
-					s.logf(diskqueue.ERROR, "%s %s", s.option.Name, "msg assert error")
-					// TODO
-					continue
+			if atomic.LoadUint32(&s.status)&diskTempNotRead == diskTempNotRead {
+				select {
+				case <-s.close:
+					s.logf(diskqueue.INFO, "%s %s", s.option.Name, "background job exit success ...")
+					s.closeDone <- 1
+					runtime.Goexit()
+				case msg := <-s.memoryMsgQueue.Consumer():
+					switch msg.(type) {
+					case Message:
+						_msg = msg.(Message)
+					default:
+						s.logf(diskqueue.ERROR, "%s %s", s.option.Name, "msg assert error")
+						// TODO
+						continue
+					}
 				}
-			case msg := <-s.diskMsgQueue.Queue.ReadChan():
-				_msg = s.newMsg()
-				_msg.Decode(msg)
+			} else {
+				select {
+				case <-s.close:
+					s.logf(diskqueue.INFO, "%s %s", s.option.Name, "background job exit success ...")
+					s.closeDone <- 1
+					runtime.Goexit()
+				case msg := <-s.memoryMsgQueue.Consumer():
+					switch msg.(type) {
+					case Message:
+						_msg = msg.(Message)
+					case nil:
+					default:
+						s.logf(diskqueue.ERROR, "%s %s", s.option.Name, "msg assert error")
+						// TODO
+						continue
+					}
+				case msg := <-s.diskMsgQueue.Queue.ReadChan():
+					_msg = s.newMsg()
+					_msg.Decode(msg)
+				}
 			}
 			/*
 			 * send message
@@ -209,8 +238,8 @@ func (s *Service) Release() {
 // Exit ...
 func (s *Service) Exit() {
 	s.logf(diskqueue.INFO, "service %s %s", s.option.Name, "begin to stop ...")
-	atomic.StoreUint32(&s.status, closed) // close put method
-	s.close <- 1                          // stop background worker first
+	atomic.StoreUint32(&s.status, s.status|closed) // close put method
+	s.close <- 1                                   // stop background worker first
 	<-s.closeDone
 	/* Flush no-locker queue message to disk
 	 * Depends on whether use s.RequeueMessage(&v) in RegistHandler func
