@@ -99,6 +99,7 @@ func (s *Service) RequeueMessage(msg Message) error {
 			time.Sleep(time.Second * 10)
 			atomic.StoreUint32(&s.status, atomic.LoadUint32(&s.status)^diskTempNotRead)
 			atomic.StoreUint32(&s.retrytimes, 0)
+			s.memoryMsgQueue.Msg <- nil // wake up
 		}()
 	}
 	timer := time.NewTimer(s.option.RequeueTime)
@@ -167,6 +168,8 @@ func (s *Service) background() {
 					switch msg.(type) {
 					case Message:
 						_msg = msg.(Message)
+					case nil:
+						continue
 					default:
 						s.logf(diskqueue.ERROR, "%s %s", s.option.Name, "msg assert error")
 						// TODO
@@ -184,6 +187,7 @@ func (s *Service) background() {
 					case Message:
 						_msg = msg.(Message)
 					case nil:
+						continue
 					default:
 						s.logf(diskqueue.ERROR, "%s %s", s.option.Name, "msg assert error")
 						// TODO
@@ -269,6 +273,7 @@ func (s *Service) Exit() {
 					// log.L.Errorln(err)
 				}
 			case nil:
+				continue
 			}
 		default:
 			goto flush
